@@ -1,0 +1,102 @@
+import torch
+from torch import nn
+from torch.nn import init
+import torch.utils.data as Data
+#import matplotlib.pyplot as plt
+import numpy as np
+BATCH_SIZE = 64#每批个数
+EPOCH = 10#训练次数
+
+LR = 0.002
+N_HIDDEN = 16#隐藏层数
+#ACTIVATION = torch.sigmoid#激励函数LOSS=6738 loss降得慢 但是测试拟合的较好
+ACTIVATION = torch.relu#loss前期降得快但会有反弹现象，而且4000多的时候降不下去了这个不好用
+#ACTIVATION = torch.tanh#偶尔会有反弹现象结果不是太好有一个值是负的不建议用
+B_INIT = 0  
+class Net(nn.Module):#建立网络
+    def __init__(self, batch_normalization=False):
+        super(Net, self).__init__()
+        self.do_bn = batch_normalization
+        self.fcs = []
+        self.bns = []
+        self.bn_input = nn.BatchNorm1d(5, momentum=0.5)   # for input data
+
+        for i in range(N_HIDDEN):               # build hidden layers and BN layers
+            input_size = 5 if i == 0 else 16
+            fc = nn.Linear(input_size, 16)
+            setattr(self, 'fc%i' % i, fc)       # IMPORTANT set layer to the Module
+            self._set_init(fc)                  # parameters initialization
+            self.fcs.append(fc)
+            if self.do_bn:
+                bn = nn.BatchNorm1d(16, momentum=0.5)
+                setattr(self, 'bn%i' % i, bn)   # IMPORTANT set layer to the Module
+                self.bns.append(bn)
+
+        self.predict = nn.Linear(16, 5)         # output layer
+        self._set_init(self.predict)            # parameters initialization
+
+    def _set_init(self, layer):#初始化
+        init.normal_(layer.weight, mean=0., std=.1)
+        init.constant_(layer.bias, B_INIT)
+
+    def forward(self, x):
+#        pre_activation = [x]
+        if self.do_bn: x = self.bn_input(x)     # input batch normalization
+#        layer_input = [x]
+        for i in range(N_HIDDEN):
+            x = self.fcs[i](x)
+#            pre_activation.append(x)
+            if self.do_bn: x = self.bns[i](x)   # batch normalization
+            x = ACTIVATION(x)
+#            layer_input.append(x)
+        out = self.predict(x)
+        return out# layer_input, pre_activation
+net = torch.load('calibration6（50000）.pkl')
+
+print(net)
+z =  torch.from_numpy(np.loadtxt('test.txt')) 
+z = z.float()
+
+net.eval()  
+p = net(z)
+
+#p = p.data.numpy()
+#print(p)
+
+from tkinter import *
+
+
+def printInfo():
+    # 清理entry2
+   #entry2.delete(0, END)
+    # 根据输入半径计算面积
+
+    entry2.insert(INSERT, p)
+    # 清空entry2控件
+
+
+
+# 初始化Tk()
+myWindow = Tk()
+# 设置标题
+myWindow.title('PFC3D Calibration')
+myWindow.geometry('600x200')
+# 标签控件布局
+
+Label(myWindow, text="Calibration result", width=15, height=5, bg = "green",).grid(row=1, column= 1)
+
+# Entry控件布局
+
+entry2 = Text(myWindow,width=50, height=10)
+
+entry2.grid(row=1, column=300,)
+
+# Quit按钮退出；Run按钮打印计算结果
+Button(myWindow, text='Quit', command=myWindow.quit).grid(row=2, column=0, sticky=W, padx=5, pady=5)
+Button(myWindow, text='Run', command=printInfo).grid(row=2, column=2, sticky=W, padx=5, pady=5)
+
+# 进入消息循环
+myWindow.mainloop()
+
+
+
